@@ -24,7 +24,7 @@ impl Context {
 
     /// Return a plain-text 200 response (placeholder until doido-view is wired).
     pub fn render(&self, template: &str, _data: serde_json::Value) -> Response {
-        axum::response::Response::builder()
+        Response::builder()
             .status(StatusCode::OK)
             .body(Body::from(format!("render:{template}")))
             .unwrap()
@@ -33,7 +33,7 @@ impl Context {
     /// Return a JSON 200 response.
     pub fn json<T: Serialize>(&self, data: T) -> Response {
         let body = serde_json::to_vec(&data).unwrap_or_default();
-        axum::response::Response::builder()
+        Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(body))
@@ -42,7 +42,7 @@ impl Context {
 
     /// Return a 302 redirect.
     pub fn redirect_to(&self, location: impl AsRef<str>) -> Response {
-        axum::response::Response::builder()
+        Response::builder()
             .status(StatusCode::FOUND)
             .header(header::LOCATION, HeaderValue::from_str(location.as_ref()).unwrap())
             .body(Body::empty())
@@ -50,8 +50,9 @@ impl Context {
     }
 
     /// Return a response with an explicit status code and empty body.
+    /// `code` must be a valid HTTP status code (100–999).
     pub fn status(&self, code: u16) -> Response {
-        axum::response::Response::builder()
+        Response::builder()
             .status(code)
             .body(Body::empty())
             .unwrap()
