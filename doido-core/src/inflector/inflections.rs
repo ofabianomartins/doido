@@ -114,7 +114,7 @@ impl Inflections {
             if c.is_uppercase() && i > 0 {
                 let prev = chars[i - 1];
                 let next = chars.get(i + 1);
-                let next_is_lower = next.map_or(false, |n| n.is_lowercase());
+                let next_is_lower = next.is_some_and(|n| n.is_lowercase());
                 let prev_is_lower = prev.is_lowercase() || prev.is_numeric();
                 if prev_is_lower || (prev.is_uppercase() && next_is_lower) {
                     out.push('_');
