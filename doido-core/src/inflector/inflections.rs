@@ -45,6 +45,66 @@ impl Inflections {
     pub fn acronym(&mut self, word: &str) {
         self.acronyms.insert(word.to_uppercase());
     }
+
+    /// Returns the plural form of `word` according to the configured rules.
+    pub fn pluralize(&self, word: &str) -> String {
+        let lower = word.to_lowercase();
+
+        // 1. Uncountables are returned unchanged.
+        if self.uncountables.contains(&lower) {
+            return word.to_string();
+        }
+
+        // 2. Irregulars take priority over regex rules.
+        for (singular, plural) in &self.irregulars {
+            if singular == &lower {
+                return plural.clone();
+            }
+            if plural == &lower {
+                // Already plural — return as-is.
+                return plural.clone();
+            }
+        }
+
+        // 3. Regex rules — tried in reverse add-order (last added = highest priority).
+        for (pattern, replacement) in self.plurals.iter().rev() {
+            if pattern.is_match(&lower) {
+                return pattern.replace(&lower, replacement.as_str()).to_string();
+            }
+        }
+
+        word.to_string()
+    }
+
+    /// Returns the singular form of `word` according to the configured rules.
+    pub fn singularize(&self, word: &str) -> String {
+        let lower = word.to_lowercase();
+
+        // 1. Uncountables.
+        if self.uncountables.contains(&lower) {
+            return word.to_string();
+        }
+
+        // 2. Irregulars — lookup by plural form.
+        for (singular, plural) in &self.irregulars {
+            if plural == &lower {
+                return singular.clone();
+            }
+            if singular == &lower {
+                // Already singular — return as-is.
+                return singular.clone();
+            }
+        }
+
+        // 3. Regex rules.
+        for (pattern, replacement) in self.singulars.iter().rev() {
+            if pattern.is_match(&lower) {
+                return pattern.replace(&lower, replacement.as_str()).to_string();
+            }
+        }
+
+        word.to_string()
+    }
 }
 
 impl Default for Inflections {
