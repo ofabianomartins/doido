@@ -1,1 +1,5 @@
-// filled in Task 5
+use super::inflections::Inflections;
+
+pub fn defaults() -> Inflections {
+    Inflections::new()
+}
