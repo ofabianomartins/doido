@@ -175,6 +175,21 @@ impl Inflections {
 
         word.to_string()
     }
+
+    /// `PostComment` → `post_comments`  (underscore then pluralize).
+    pub fn tableize(&self, s: &str) -> String {
+        self.pluralize(&self.underscore(s))
+    }
+
+    /// `post_comments` → `PostComment`  (singularize then camelize).
+    pub fn classify(&self, s: &str) -> String {
+        self.camelize(&self.singularize(s))
+    }
+
+    /// `PostComment` → `post_comment_id`.
+    pub fn foreign_key(&self, s: &str) -> String {
+        format!("{}_id", self.underscore(s))
+    }
 }
 
 impl Default for Inflections {

@@ -176,3 +176,55 @@ fn test_constantize() {
     assert_eq!(i.constantize("post_comment"), "POST_COMMENT");
     assert_eq!(i.constantize("active-record"), "ACTIVE_RECORD");
 }
+
+// ── tableize and classify (inverses) ─────────────────────────────────────
+
+#[test]
+fn test_tableize() {
+    let i = Inflections::default();
+    assert_eq!(i.tableize("PostComment"), "post_comments");
+    assert_eq!(i.tableize("Person"), "people");
+}
+
+#[test]
+fn test_classify() {
+    let i = Inflections::default();
+    assert_eq!(i.classify("post_comments"), "PostComment");
+}
+
+#[test]
+fn test_tableize_classify_are_inverses() {
+    let i = Inflections::default();
+    let original = "PostComment";
+    assert_eq!(i.classify(&i.tableize(original)), original);
+}
+
+// ── foreign_key ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_foreign_key() {
+    let i = Inflections::default();
+    assert_eq!(i.foreign_key("PostComment"), "post_comment_id");
+    assert_eq!(i.foreign_key("Person"), "person_id");
+}
+
+// ── acronym support in camelize ───────────────────────────────────────────
+
+#[test]
+fn test_camelize_with_acronym() {
+    let mut i = Inflections::default();
+    i.acronym("API");
+    i.acronym("HTML");
+    assert_eq!(i.camelize("api_client"), "APIClient");
+    assert_eq!(i.camelize("html_parser"), "HTMLParser");
+}
+
+// ── acronym support in underscore ────────────────────────────────────────
+
+#[test]
+fn test_underscore_acronym_sequence() {
+    let i = Inflections::default();
+    // No acronym registration needed — the algorithm handles uppercase runs.
+    assert_eq!(i.underscore("APIClient"), "api_client");
+    assert_eq!(i.underscore("HTMLParser"), "html_parser");
+}
