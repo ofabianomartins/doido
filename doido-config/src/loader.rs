@@ -44,6 +44,20 @@ pub(crate) fn load_layers(root: &Path, env: &str) -> Result<toml::Value> {
         merged = deep_merge(merged, env_value);
     }
 
+    // 3. Encrypted credentials — optional file, but key is required when file exists
+    let cred_path = root.join("config/credentials.toml.enc");
+    if cred_path.exists() {
+        let key = crate::crypto::load_master_key(root)
+            .context("failed to load master key for credentials.toml.enc")?;
+        let encoded = std::fs::read_to_string(&cred_path)
+            .context("failed to read config/credentials.toml.enc")?;
+        let plaintext = crate::crypto::decrypt_credentials(&encoded, &key)
+            .context("failed to decrypt config/credentials.toml.enc")?;
+        let cred_value: toml::Value = toml::from_str(&plaintext)
+            .context("failed to parse decrypted credentials as TOML")?;
+        merged = deep_merge(merged, cred_value);
+    }
+
     Ok(merged)
 }
 
@@ -135,5 +149,48 @@ level = "info"
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("config/doido.toml not found"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_load_layers_merges_credentials() {
+        use crate::crypto::encrypt_credentials;
+        let dir = TempDir::new().unwrap();
+        write(&dir, "config/doido.toml", BASE);
+
+        let key = [0u8; 32];
+        let cred_toml = "[database]\nurl = \"postgres://secret@prod/db\"\n";
+        let encrypted = encrypt_credentials(cred_toml, &key).unwrap();
+        write(&dir, "config/credentials.toml.enc", &encrypted);
+
+        let hex_key = "00".repeat(32);
+        write(&dir, "config/master.key", &hex_key);
+
+        let val = super::load_layers(dir.path(), "noenv").unwrap();
+        assert_eq!(val["database"]["url"].as_str(), Some("postgres://secret@prod/db"));
+        assert_eq!(val["server"]["port"].as_integer(), Some(3000));
+    }
+
+    #[test]
+    fn test_load_layers_skips_credentials_when_file_absent() {
+        let dir = TempDir::new().unwrap();
+        write(&dir, "config/doido.toml", BASE);
+        let val = super::load_layers(dir.path(), "noenv").unwrap();
+        assert_eq!(val["server"]["port"].as_integer(), Some(3000));
+    }
+
+    #[test]
+    fn test_load_layers_errors_when_credentials_exist_but_key_missing() {
+        let dir = TempDir::new().unwrap();
+        write(&dir, "config/doido.toml", BASE);
+        write(&dir, "config/credentials.toml.enc", "fake-encrypted-content");
+        if std::env::var("DOIDO_MASTER_KEY").is_err() {
+            let result = super::load_layers(dir.path(), "noenv");
+            assert!(result.is_err());
+            let msg = result.unwrap_err().to_string();
+            assert!(
+                msg.contains("master key") || msg.contains("master.key"),
+                "got: {msg}"
+            );
+        }
     }
 }
