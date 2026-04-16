@@ -1,4 +1,5 @@
 use doido_core::inflector::Inflections;
+use doido_core::inflector::Inflector;
 
 // ── pluralize ──────────────────────────────────────────────────────────────
 
@@ -227,4 +228,44 @@ fn test_underscore_acronym_sequence() {
     // No acronym registration needed — the algorithm handles uppercase runs.
     assert_eq!(i.underscore("APIClient"), "api_client");
     assert_eq!(i.underscore("HTMLParser"), "html_parser");
+}
+
+// ── static Inflector facade ───────────────────────────────────────────────
+
+#[test]
+fn test_inflector_static_pluralize() {
+    assert_eq!(Inflector::pluralize("post"), "posts");
+    assert_eq!(Inflector::pluralize("person"), "people");
+    assert_eq!(Inflector::pluralize("sheep"), "sheep");
+}
+
+#[test]
+fn test_inflector_static_singularize() {
+    assert_eq!(Inflector::singularize("posts"), "post");
+    assert_eq!(Inflector::singularize("people"), "person");
+}
+
+#[test]
+fn test_inflector_static_camelize() {
+    assert_eq!(Inflector::camelize("post_comment"), "PostComment");
+}
+
+#[test]
+fn test_inflector_static_underscore() {
+    assert_eq!(Inflector::underscore("PostComment"), "post_comment");
+}
+
+#[test]
+fn test_inflector_static_tableize() {
+    assert_eq!(Inflector::tableize("PostComment"), "post_comments");
+}
+
+#[test]
+fn test_inflector_static_classify() {
+    assert_eq!(Inflector::classify("post_comments"), "PostComment");
+}
+
+#[test]
+fn test_inflector_static_foreign_key() {
+    assert_eq!(Inflector::foreign_key("PostComment"), "post_comment_id");
 }
