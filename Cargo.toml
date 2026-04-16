@@ -1,20 +1,5 @@
 [workspace]
 resolver = "2"
 members = [
-    "doido",
     "doido-core",
-    "doido-router",
-    "doido-controller",
-    "doido-model",
-    "doido-view",
-    "doido-config",
-    "doido-cli",
-    "doido-generators",
-    "doido-mailer",
-    "doido-jobs",
-    "doido-cache",
-    "doido-middleware",
-    "doido-cable",
-    "doido-kafka",
-    "doido-mcp",
 ]
