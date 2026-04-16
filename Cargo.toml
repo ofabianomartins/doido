@@ -2,4 +2,5 @@
 resolver = "2"
 members = [
     "doido-core",
+    "doido-config",
 ]
