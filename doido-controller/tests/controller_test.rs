@@ -287,3 +287,61 @@ async fn test_after_action_fires_after_action_body() {
     assert_eq!(resp.status(), StatusCode::OK);
     assert!(AFTER_FIRED.with(|f| f.get()), "after_action was not called");
 }
+
+async fn auth_guard(ctx: &mut Context) -> Result<(), doido_controller::Response> {
+    if ctx.header("authorization").is_none() {
+        return Err(ctx.status(401));
+    }
+    Ok(())
+}
+
+struct ArticlesController;
+
+#[doido_controller::controller]
+impl ArticlesController {
+    #[before_action(auth_guard)]
+    async fn index(ctx: Context) -> doido_controller::Response {
+        ctx.json(serde_json::json!({"articles": []}))
+    }
+
+    async fn show(ctx: Context) -> doido_controller::Response {
+        ctx.json(serde_json::json!({"id": 1}))
+    }
+}
+
+#[tokio::test]
+async fn test_full_stack_controller_with_filters_via_axum_router() {
+    let app = axum::Router::new()
+        .route("/articles", axum::routing::get(ArticlesController::index))
+        .route("/articles/:id", axum::routing::get(ArticlesController::show));
+
+    // No auth — before_action halts with 401
+    let resp = app.clone()
+        .oneshot(Request::builder().uri("/articles").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // With auth — action runs, returns JSON
+    let resp = app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/articles")
+                .header("authorization", "Bearer token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(v["articles"].is_array());
+
+    // show has no filter — always 200
+    let resp = app
+        .oneshot(Request::builder().uri("/articles/1").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
