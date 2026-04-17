@@ -98,3 +98,42 @@ fn test_resources_url_helpers() {
     // generated as fn items but are scoped to the routes! block expression.
     // Verified by successful compilation above.
 }
+
+#[tokio::test]
+async fn test_resources_only_restricts_to_listed_actions() {
+    let app = doido_router::routes! {
+        resources!(posts, posts_controller, only: [index, show])
+    };
+    // index exists → 200
+    let resp = app.clone().oneshot(Request::get("/posts").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // show exists → 200
+    let resp = app.clone().oneshot(Request::get("/posts/1").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // new is excluded → 404 (path not registered) or 405 or 400 (matched /:id but parse fails)
+    let resp = app.oneshot(Request::get("/posts/new").body(Body::empty()).unwrap()).await.unwrap();
+    assert!(
+        resp.status() == StatusCode::NOT_FOUND
+            || resp.status() == StatusCode::METHOD_NOT_ALLOWED
+            || resp.status() == StatusCode::BAD_REQUEST,
+        "expected 404, 405, or 400, got {}", resp.status()
+    );
+}
+
+#[tokio::test]
+async fn test_resources_except_excludes_listed_actions() {
+    let app = doido_router::routes! {
+        resources!(posts, posts_controller, except: [destroy])
+    };
+    // index exists → 200
+    let resp = app.clone().oneshot(Request::get("/posts").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // destroy excluded → DELETE /posts/1 returns 405 (path /posts/:id still registered for show/update)
+    let resp = app.oneshot(
+        Request::builder().method("DELETE").uri("/posts/1").body(Body::empty()).unwrap()
+    ).await.unwrap();
+    assert!(
+        resp.status() == StatusCode::METHOD_NOT_ALLOWED || resp.status() == StatusCode::NOT_FOUND,
+        "expected 405 or 404, got {}", resp.status()
+    );
+}
