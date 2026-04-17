@@ -180,3 +180,30 @@ async fn test_namespace_member_route_prefixed() {
     let resp = app.oneshot(Request::get("/api/users/1").body(Body::empty()).unwrap()).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+#[tokio::test]
+async fn test_combined_routes_block() {
+    let app = doido_router::routes! {
+        resources!(posts, posts_controller)
+        get!("/about", about_handler)
+        namespace!(api, {
+            resources!(users, users_controller)
+        })
+        scope!("/v2", {
+            resources!(posts, posts_controller)
+        })
+    };
+
+    // resources
+    let r = app.clone().oneshot(Request::get("/posts").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    // custom route
+    let r = app.clone().oneshot(Request::get("/about").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    // namespace
+    let r = app.clone().oneshot(Request::get("/api/users").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    // scope
+    let r = app.oneshot(Request::get("/v2/posts").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+}
