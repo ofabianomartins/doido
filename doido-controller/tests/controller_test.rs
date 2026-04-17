@@ -110,3 +110,83 @@ async fn test_controller_show_action_via_axum() {
 
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+// Filter functions
+async fn require_auth(ctx: &mut Context) -> Result<(), doido_controller::Response> {
+    if ctx.header("x-auth-token").is_none() {
+        return Err(ctx.status(401));
+    }
+    Ok(())
+}
+
+async fn set_locale(_ctx: &mut Context) -> Result<(), doido_controller::Response> {
+    Ok(()) // always passes
+}
+
+struct SecureController;
+
+#[doido_controller::controller]
+impl SecureController {
+    #[before_action(require_auth)]
+    async fn secret(ctx: Context) -> doido_controller::Response {
+        ctx.json(serde_json::json!({"secret": "data"}))
+    }
+
+    #[before_action(require_auth)]
+    #[before_action(set_locale)]
+    async fn double_filtered(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+}
+
+#[tokio::test]
+async fn test_before_action_halts_when_filter_returns_err() {
+    let app = axum::Router::new()
+        .route("/secret", axum::routing::get(SecureController::secret));
+
+    // No auth token — filter should return 401
+    let resp = app.clone()
+        .oneshot(Request::builder().uri("/secret").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // With auth token — filter passes, action runs
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/secret")
+                .header("x-auth-token", "valid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_multiple_before_actions_run_in_order() {
+    let app = axum::Router::new()
+        .route("/double", axum::routing::get(SecureController::double_filtered));
+
+    // Without auth — first filter halts
+    let resp = app.clone()
+        .oneshot(Request::builder().uri("/double").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // With auth — both filters pass, action runs
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/double")
+                .header("x-auth-token", "valid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
