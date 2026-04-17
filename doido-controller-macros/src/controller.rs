@@ -35,8 +35,8 @@ pub fn expand_controller(_attr: TokenStream, item: TokenStream) -> Result<TokenS
             pub async fn #fn_name(
                 req: ::axum::extract::Request,
             ) -> ::axum::response::Response {
-                let (parts, _body) = req.into_parts();
-                let ctx = ::doido_controller::Context::from_request_parts(parts);
+                let (parts, body) = req.into_parts();
+                let ctx = ::doido_controller::Context::from_request(parts, body);
                 #body
             }
         });

@@ -8,11 +8,16 @@ use serde::Serialize;
 /// Per-request context passed to every action.
 pub struct Context {
     pub(crate) parts: http::request::Parts,
+    pub(crate) body: Body,
 }
 
 impl Context {
     pub fn from_request_parts(parts: http::request::Parts) -> Self {
-        Self { parts }
+        Self { parts, body: Body::empty() }
+    }
+
+    pub fn from_request(parts: http::request::Parts, body: Body) -> Self {
+        Self { parts, body }
     }
 
     /// Deserialize typed params from the request URI query string.
