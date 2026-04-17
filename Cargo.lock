@@ -240,6 +240,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "doido-router"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "doido-core",
+ "doido-router-macros",
+ "http",
+ "http-body-util",
+ "tokio",
+ "tower 0.4.13",
+]
+
+[[package]]
+name = "doido-router-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
