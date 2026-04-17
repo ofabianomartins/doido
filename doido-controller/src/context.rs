@@ -8,6 +8,7 @@ use serde::Serialize;
 /// Per-request context passed to every action.
 pub struct Context {
     pub(crate) parts: http::request::Parts,
+    #[allow(dead_code)] // reserved for body-param deserialization (future use)
     pub(crate) body: Body,
 }
 
