@@ -254,3 +254,36 @@ async fn test_before_action_only_fires_for_specified_actions() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+thread_local! {
+    static AFTER_FIRED: std::cell::Cell<bool> = std::cell::Cell::new(false);
+}
+
+async fn log_response(_ctx: &mut Context) {
+    AFTER_FIRED.with(|f| f.set(true));
+}
+
+struct LoggedController;
+
+#[doido_controller::controller]
+impl LoggedController {
+    #[after_action(log_response)]
+    async fn index(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+}
+
+#[tokio::test]
+async fn test_after_action_fires_after_action_body() {
+    AFTER_FIRED.with(|f| f.set(false));
+
+    let app = axum::Router::new()
+        .route("/logged", axum::routing::get(LoggedController::index));
+
+    let resp = app
+        .oneshot(Request::builder().uri("/logged").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(AFTER_FIRED.with(|f| f.get()), "after_action was not called");
+}
