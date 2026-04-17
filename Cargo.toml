@@ -7,4 +7,5 @@ members = [
     "doido-controller",
     "doido-router-macros",
     "doido-router",
+    "doido-view",
 ]
