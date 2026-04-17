@@ -10,7 +10,7 @@ fn is_active(action: &str, filter: &ResourceFilter) -> bool {
     }
 }
 
-pub fn generate(input: RoutesInput) -> TokenStream {
+fn generate_inner(input: RoutesInput, path_prefix: Option<&str>, helper_prefix: Option<&str>) -> TokenStream {
     let mut route_stmts = Vec::new();
     let mut helper_fns = Vec::new();
 
@@ -18,17 +18,25 @@ pub fn generate(input: RoutesInput) -> TokenStream {
         match decl {
             RouteDecl::Method { method, path, handler } => {
                 let axum_method = syn::Ident::new(&method, Span::call_site());
+                let full_path = match path_prefix {
+                    Some(pfx) => {
+                        let combined = format!("{}{}", pfx, path.value());
+                        syn::LitStr::new(&combined, path.span())
+                    }
+                    None => path,
+                };
                 route_stmts.push(quote! {
-                    .route(#path, axum::routing::#axum_method(#handler))
+                    .route(#full_path, axum::routing::#axum_method(#handler))
                 });
             }
             RouteDecl::Resources { resource_name, controller, filter } => {
                 let name = resource_name.to_string();
                 let singular = name.trim_end_matches('s').to_string();
-                let base = format!("/{}", name);
-                let base_new = format!("/{}/new", name);
-                let base_id = format!("/{}/:id", name);
-                let base_id_edit = format!("/{}/:id/edit", name);
+                let prefix = path_prefix.unwrap_or("");
+                let base = format!("{}/{}", prefix, name);
+                let base_new = format!("{}/{}/new", prefix, name);
+                let base_id = format!("{}/{}/:id", prefix, name);
+                let base_id_edit = format!("{}/{}/:id/edit", prefix, name);
                 let ctrl = &controller;
 
                 let mut collection = quote! { axum::routing::MethodRouter::new() };
@@ -60,11 +68,20 @@ pub fn generate(input: RoutesInput) -> TokenStream {
                     route_stmts.push(quote! { .route(#base_id_edit, axum::routing::get(#ctrl::edit)) });
                 }
 
-                // URL helpers (block-scoped to the routes! expansion)
-                let collection_fn = format_ident!("{}_path", name);
-                let new_fn = format_ident!("new_{}_path", singular);
-                let member_fn = format_ident!("{}_path", singular);
-                let edit_fn = format_ident!("edit_{}_path", singular);
+                // URL helpers with optional prefix
+                let helper_name = match helper_prefix {
+                    Some(pfx) => format!("{}_{}", pfx, name),
+                    None => name.clone(),
+                };
+                let helper_singular = match helper_prefix {
+                    Some(pfx) => format!("{}_{}", pfx, singular),
+                    None => singular.clone(),
+                };
+
+                let collection_fn = format_ident!("{}_path", helper_name);
+                let new_fn = format_ident!("new_{}_path", helper_singular);
+                let member_fn = format_ident!("{}_path", helper_singular);
+                let edit_fn = format_ident!("edit_{}_path", helper_singular);
 
                 helper_fns.push(quote! {
                     #[allow(dead_code)]
@@ -81,6 +98,27 @@ pub fn generate(input: RoutesInput) -> TokenStream {
                     }
                 });
             }
+            RouteDecl::Namespace { name, body } => {
+                let ns_str = name.to_string();
+                let ns_path = match path_prefix {
+                    Some(pfx) => format!("{}/{}", pfx, ns_str),
+                    None => format!("/{}", ns_str),
+                };
+                let combined_helper = match helper_prefix {
+                    Some(pfx) => format!("{}_{}", pfx, ns_str),
+                    None => ns_str,
+                };
+                let inner_ts = generate_inner(body, Some(&ns_path), Some(&combined_helper));
+                route_stmts.push(quote! { .merge(#inner_ts) });
+            }
+            RouteDecl::Scope { path_prefix: scope_path, body } => {
+                let full_path = match path_prefix {
+                    Some(pfx) => format!("{}{}", pfx, scope_path.value()),
+                    None => scope_path.value(),
+                };
+                let inner_ts = generate_inner(body, Some(&full_path), helper_prefix);
+                route_stmts.push(quote! { .merge(#inner_ts) });
+            }
         }
     }
 
@@ -91,4 +129,8 @@ pub fn generate(input: RoutesInput) -> TokenStream {
             #(#route_stmts)*
         }
     }
+}
+
+pub fn generate(input: RoutesInput) -> TokenStream {
+    generate_inner(input, None, None)
 }

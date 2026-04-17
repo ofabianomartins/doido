@@ -1,5 +1,5 @@
 use syn::{
-    bracketed,
+    braced, bracketed,
     parse::{Parse, ParseStream},
     Expr, Ident, LitStr, Result, Token,
 };
@@ -7,6 +7,8 @@ use syn::{
 pub enum RouteDecl {
     Method { method: String, path: LitStr, handler: Expr },
     Resources { resource_name: Ident, controller: Ident, filter: ResourceFilter },
+    Namespace { name: Ident, body: RoutesInput },
+    Scope { path_prefix: LitStr, body: RoutesInput },
 }
 
 pub enum ResourceFilter {
@@ -42,6 +44,22 @@ impl Parse for RoutesInput {
             let _semi: Option<Token![;]> = input.parse().ok();
 
             match macro_ident.to_string().as_str() {
+                "namespace" => {
+                    let name: Ident = content.parse()?;
+                    let _comma: Token![,] = content.parse()?;
+                    let inner;
+                    braced!(inner in content);
+                    let body: RoutesInput = inner.parse()?;
+                    decls.push(RouteDecl::Namespace { name, body });
+                }
+                "scope" => {
+                    let path_prefix: LitStr = content.parse()?;
+                    let _comma: Token![,] = content.parse()?;
+                    let inner;
+                    braced!(inner in content);
+                    let body: RoutesInput = inner.parse()?;
+                    decls.push(RouteDecl::Scope { path_prefix, body });
+                }
                 "resources" => {
                     let resource_name: Ident = content.parse()?;
                     let _comma: Token![,] = content.parse()?;

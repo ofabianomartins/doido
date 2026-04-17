@@ -137,3 +137,46 @@ async fn test_resources_except_excludes_listed_actions() {
         "expected 405 or 404, got {}", resp.status()
     );
 }
+
+mod users_controller {
+    pub async fn index() -> &'static str { "users" }
+    pub async fn show(axum::extract::Path(_id): axum::extract::Path<u64>) -> &'static str { "user" }
+    pub async fn create() -> &'static str { "create user" }
+    pub async fn new() -> &'static str { "new user" }
+    pub async fn edit(axum::extract::Path(_id): axum::extract::Path<u64>) -> &'static str { "edit user" }
+    pub async fn update(axum::extract::Path(_id): axum::extract::Path<u64>) -> &'static str { "update user" }
+    pub async fn destroy(axum::extract::Path(_id): axum::extract::Path<u64>) -> &'static str { "del user" }
+}
+
+#[tokio::test]
+async fn test_namespace_prefixes_path() {
+    let app = doido_router::routes! {
+        namespace!(api, {
+            resources!(users, users_controller)
+        })
+    };
+    let resp = app.oneshot(Request::get("/api/users").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_scope_prefixes_path() {
+    let app = doido_router::routes! {
+        scope!("/v2", {
+            resources!(users, users_controller)
+        })
+    };
+    let resp = app.oneshot(Request::get("/v2/users").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_namespace_member_route_prefixed() {
+    let app = doido_router::routes! {
+        namespace!(api, {
+            resources!(users, users_controller)
+        })
+    };
+    let resp = app.oneshot(Request::get("/api/users/1").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
