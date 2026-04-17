@@ -1,10 +1,15 @@
+mod controller;
+
 use proc_macro::TokenStream;
 
 /// Marks an impl block as a controller. Rewrites action methods into
 /// axum-compatible handlers with filter chain support.
 #[proc_macro_attribute]
-pub fn controller(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn controller(attr: TokenStream, item: TokenStream) -> TokenStream {
+    match controller::expand_controller(attr.into(), item.into()) {
+        Ok(ts) => ts.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
 }
 
 /// Registers a before-action filter on the following action method.

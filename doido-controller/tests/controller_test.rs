@@ -1,6 +1,8 @@
+use axum::body::Body;
 use doido_controller::Context;
 use http::{Request, StatusCode};
 use http_body_util::BodyExt;
+use tower::ServiceExt;
 use serde::Deserialize;
 
 fn make_ctx(uri: &str) -> Context {
@@ -65,4 +67,46 @@ async fn test_ctx_render_returns_ok_with_template_name() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     assert!(std::str::from_utf8(&body).unwrap().contains("posts/index"));
+}
+
+struct HelloController;
+
+#[doido_controller::controller]
+impl HelloController {
+    async fn index(ctx: Context) -> doido_controller::Response {
+        ctx.json(serde_json::json!({"message": "hello"}))
+    }
+
+    async fn show(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+}
+
+#[tokio::test]
+async fn test_controller_index_action_via_axum() {
+    let app = axum::Router::new()
+        .route("/hello", axum::routing::get(HelloController::index));
+
+    let resp = app
+        .oneshot(Request::builder().uri("/hello").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(v["message"], "hello");
+}
+
+#[tokio::test]
+async fn test_controller_show_action_via_axum() {
+    let app = axum::Router::new()
+        .route("/hello/:id", axum::routing::get(HelloController::show));
+
+    let resp = app
+        .oneshot(Request::builder().uri("/hello/1").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
 }
