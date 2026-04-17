@@ -190,3 +190,67 @@ async fn test_multiple_before_actions_run_in_order() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+async fn load_record(ctx: &mut Context) -> Result<(), doido_controller::Response> {
+    // Halt with 404 when x-id header is "0"
+    if ctx.header("x-id").map(|h| h.to_str().unwrap_or("")) == Some("0") {
+        return Err(ctx.status(404));
+    }
+    Ok(())
+}
+
+struct ScopedController;
+
+#[doido_controller::controller]
+impl ScopedController {
+    // load_record only fires for show and edit
+    #[before_action(load_record, only = [show, edit])]
+    async fn index(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+
+    #[before_action(load_record, only = [show, edit])]
+    async fn show(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+
+    #[before_action(load_record, only = [show, edit])]
+    async fn edit(ctx: Context) -> doido_controller::Response {
+        ctx.status(200)
+    }
+}
+
+#[tokio::test]
+async fn test_before_action_only_fires_for_specified_actions() {
+    let app = axum::Router::new()
+        .route("/items", axum::routing::get(ScopedController::index))
+        .route("/items/:id", axum::routing::get(ScopedController::show))
+        .route("/items/:id/edit", axum::routing::get(ScopedController::edit));
+
+    // index — filter NOT in `only` list → 200 even with x-id: 0
+    let resp = app.clone()
+        .oneshot(
+            Request::builder().uri("/items").header("x-id", "0").body(Body::empty()).unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // show — filter fires, x-id: 0 → 404
+    let resp = app.clone()
+        .oneshot(
+            Request::builder().uri("/items/1").header("x-id", "0").body(Body::empty()).unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // show — filter fires, x-id: 1 → 200
+    let resp = app
+        .oneshot(
+            Request::builder().uri("/items/1").header("x-id", "1").body(Body::empty()).unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
